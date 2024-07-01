@@ -1,0 +1,246 @@
+PAY GAP EXTRA codes
+
+Looking a data within SQL 
+
+
+--Area with the MAX and MIN pay gap 
+WITH cte_1 as (SELECT 
+left(postcode,2) as left_postcode
+, avg(diffmeanhourlypercent) as average_meanhourly
+, count(*) cnt_postcode
+FROM public.gender_pay_gap_21_22
+    WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+group by 1
+order  by 1)
+
+SELECT *, 'max'
+FROM cte_1
+WHERE average_meanhourly = (SELECT MAX(average_meanhourly) FROM cte_1)
+UNION
+SELECT 
+    *, 'min'
+FROM cte_1
+WHERE average_meanhourly = (SELECT MIN(average_meanhourly) FROM cte_1);
+
+-- review of the companies in those MIN and MAX areas
+SELECT * 
+FROM public.gender_pay_gap_21_22
+WHERE postcode LIKE 'N5%';
+
+-- MIN and MAX per area and the difference
+SELECT * 
+FROM public.gender_pay_gap_21_22
+WHERE postcode LIKE 'E3%';
+
+SELECT postcode_short
+, MIN(diffmeanhourlypercent) as min_avg
+, MAX(diffmeanhourlypercent) as max_avg
+, MAX(diffmeanhourlypercent) - MIN(diffmeanhourlypercent) as difference
+FROM (
+SELECT DISTINCT(LEFT(postcode,2)) as postcode_short
+, diffmeanhourlypercent
+FROM public.gender_pay_gap_21_22
+WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+)as sq
+GROUP BY 1
+ORDER BY 4 DESC
+
+
+--exploration 1
+SELECT employername
+, diffmeanhourlypercent
+FROM public.gender_pay_gap_21_22
+ORDER BY 2
+
+--exploration 2
+SELECT postcode_short
+, MIN(diffmeanhourlypercent) as min_avg
+, MAX(diffmeanhourlypercent) as max_avg
+, MAX(diffmeanhourlypercent) - MIN(diffmeanhourlypercent) as difference
+, COUNT(*)
+FROM (
+SELECT DISTINCT(LEFT(postcode,2)) as postcode_short
+, diffmeanhourlypercent
+FROM public.gender_pay_gap_21_22
+WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+)as sq
+GROUP BY 1
+ORDER BY 4 DESC
+
+-- different way of doing MIN and MAX (shaheed help)
+WITH cte_1 as (SELECT 
+left(postcode,2) as left_postcode
+, ROUND(avg(diffmeanhourlypercent),2) as average_meanhourly
+, count(*) cnt_postcode
+FROM public.gender_pay_gap_21_22
+    WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+group by 1
+order  by 1)
+
+SELECT *, 'max'
+FROM cte_1
+WHERE average_meanhourly = (SELECT MAX(average_meanhourly) FROM cte_1)
+UNION
+SELECT 
+    *, 'min'
+FROM cte_1
+WHERE average_meanhourly = (SELECT MIN(average_meanhourly) FROM cte_1);
+
+SELECT postcode_short
+, MIN(diffmeanhourlypercent) as min_avg
+, MAX(diffmeanhourlypercent) as max_avg
+, COUNT(*)
+FROM (
+SELECT DISTINCT(LEFT(postcode,2)) as postcode_short
+, diffmeanhourlypercent
+FROM public.gender_pay_gap_21_22
+WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+)as sq
+GROUP BY 1
+ORDER BY 3 desc
+LIMIT 10
+
+--
+SELECT*
+FROM
+(
+SELECT 
+left(postcode,2) as left_postcode
+, ROUND(avg(diffmeanhourlypercent),2) as average_meanhourly
+, count(*) cnt_postcode
+FROM public.gender_pay_gap_21_22
+    WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+group by 1
+order  by 1
+) as sq
+WHERE cnt_postcode >= 10
+ORDER BY average_meanhourly
+
+--
+SELECT*
+FROM
+(
+SELECT 
+CASE
+       WHEN address LIKE '%London,%' THEN 'London_area'
+        ELSE 'Outside London'
+        END as London_vs_Outside
+    , ROUND(avg(diffmeanhourlypercent),2) as avg_total
+    FROM public.gender_pay_gap_21_22
+    GROUP BY 1
+) as sq
+WHERE London_vs_Outside = 'London_area'
+
+
+
+with cte1 as (SELECT postcode_short
+, avg(diffmeanhourlypercent)
+, COUNT(*)
+FROM (
+SELECT DISTINCT(LEFT(postcode,2)) as postcode_short
+, diffmeanhourlypercent
+FROM public.gender_pay_gap_21_22
+WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+)as sq
+GROUP BY 1
+ORDER BY 3 desc
+LIMIT 10)
+,
+cte2 as
+(SELECT 
+CASE
+       WHEN address LIKE '%London,%' THEN 'London_area'
+        ELSE 'Outside London'
+        END as London_vs_Outside
+    , ROUND(avg(diffmeanhourlypercent),2) as avg_total
+    FROM public.gender_pay_gap_21_22
+    GROUP BY 1)
+    
+SELECT postcode_short
+FROM cte1 
+WHERE cte2 = (SELECT London_vs_Outside FROM cte2 WHERE London_vs_Outside = 'London_area')
+
+
+--Try again 
+WITH cte1 AS (
+    SELECT 
+        postcode_short,
+        AVG(diffmeanhourlypercent) AS avg_percent,
+        COUNT(*) AS num_records
+    FROM (
+        SELECT DISTINCT
+            LEFT(postcode, 2) AS postcode_short,
+            diffmeanhourlypercent
+        FROM public.gender_pay_gap_21_22
+        WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+    ) AS sq
+    GROUP BY 1
+    ORDER BY 3 DESC
+    LIMIT 10
+),
+cte2 AS (
+    SELECT 
+        CASE
+            WHEN address LIKE '%London,%' THEN 'London_area'
+            ELSE 'Outside London'
+        END AS London_vs_Outside,
+        ROUND(AVG(diffmeanhourlypercent), 2) AS avg_total
+    FROM public.gender_pay_gap_21_22
+    GROUP BY 1
+)
+
+SELECT 
+    cte1.postcode_short
+    , avg_percent
+FROM 
+    cte1
+WHERE 
+    cte2 = cte2.London_vs_Outside IN 'London_area';
+
+
+
+-- try again men vs women by london postcode 
+
+with gender_stats as
+(
+SELECT postcode
+, femalelowerquartile + femalelowermiddlequartile + femaleuppermiddlequartile + femaletopquartile as female_total
+, malelowerquartile + malelowermiddlequartile + maleuppermiddlequartile + maletopquartile as male_total
+FROM public.gender_pay_gap_21_22
+)
+, postcode_stats as
+(
+SELECT 
+left(postcode,2) as left_postcode
+FROM public.gender_pay_gap_21_22
+    WHERE postcode NOT LIKE '0' AND postcode NOT LIKE '8001'
+    AND address LIKE '%London,%'
+group by 1
+order  by 1
+    )
+    
+    SELECT 
+   left_postcode
+   , sum(female_total)
+   , sum(male_total)
+   FROM postcode_stats, gender_stats
+   GROUP BY 1
+ 
+    SELECT COUNT(*)
+FROM public.gender_pay_gap_21_22
+
+
+
+-female vs male by quartile
+SELECT 
+ ROUND(avg(femalelowerquartile),2) as avgfemalelowerquartile
+, ROUND(avg(femalelowermiddlequartile),2) as avgfemalelowermiddlequartile
+, ROUND(avg(femaleuppermiddlequartile),2) as avgfemaleuppermiddlequartile
+, ROUND(avg(femaletopquartile),2) as avgfemaletopquartile
+, ROUND(avg(malelowerquartile),2) as avgmalelowerquartile
+, ROUND(avg(malelowermiddlequartile),2) as avgmalelowermiddlequartile
+, ROUND(avg(maleuppermiddlequartile),2) as avgmaleuppermiddlequartile
+, ROUND(avg(maletopquartile),2) as avgmaletopquartile
+FROM public.gender_pay_gap_21_22
+    
+

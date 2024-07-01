@@ -1,0 +1,76 @@
+SQL labsolutions and explorations	- SQL lite
+
+SELECT *
+FROM siccodes;
+
+SELECT *
+FROM new_gpg_all;
+
+SELECT siccodes
+FROM new_gpg_all;
+
+SELECT siccodes 
+, REPLACE(SUBSTR(siccodes, 1, 5),',','')
+, SUBSTR(siccodes, 1, INSTR(siccodes, ',') - 1) AS left_part
+, CASE WHEN length(REPLACE(SUBSTR(siccodes, 1, 5),',','')) <>5 THEN 'NA'
+ELSE  REPLACE(SUBSTR(siccodes, 1, 5),',','') END as new_sic
+FROM new_gpg_all;
+
+--alter table to include a new column
+ALTER TABLE new_gpg_all
+ADD COLUMN new_sic INTEGER
+
+-- update the new column with forumal needed to fill
+UPDATE new_gpg_all
+SET new_sic = 
+
+-- what you want to fill with 
+(CAST(CASE WHEN length(REPLACE(SUBSTR(siccodes, 1, 5),',','')) <>5 THEN 'NA'
+ELSE  REPLACE(SUBSTR(siccodes, 1, 5),',','') END as integer));
+
+-- can we join them
+SELECT *
+FROM new_gpg_all gpg
+JOIN siccodes sic
+ON gpg.siccodes = sic.code;
+
+--how many companies in each section 
+SELECT section 
+, COUNT(*)
+FROM new_gpg_all gpg
+JOIN siccodes sic
+ON gpg.siccodes = sic.code
+GROUP BY 1
+ORDER BY 2 DESC;
+
+
+SELECT section 
+, COUNT(*)
+, ROUND(AVG(diffmeanhourlypercent),2) as ave_meandiff
+, ROUND(AVG(diffmedianhourlypercent),2) as ave_meandiff
+FROM new_gpg_all gpg
+JOIN siccodes sic
+ON gpg.siccodes = sic.code
+GROUP BY 1
+ORDER BY 2 DESC;
+
+
+
+
+--How many companies in each section?
+SELECT Section
+, employersize
+,COUNT(*)  no_companies
+, COUNT(new_sic)
+, ROUND(AVG(diffmeanhourlypercent),2) ave_meandiff
+, ROUND(AVG(diffmedianhourlypercent),2) ave_mediandiff
+, ( ROUND(AVG(diffmeanhourlypercent),2) - ROUND(AVG(diffmedianhourlypercent),2)) as mean_median_gap
+, MIN(diffmeanhourlypercent)
+, MAX(diffmeanhourlypercent)
+, ROUND(AVG((diffmeanhourlypercent - (select avg(diffmeanhourlypercent) from GPG_data_all_2122))
+*(diffmeanhourlypercent - (select avg(diffmeanhourlypercent) from GPG_data_all_2122))),1) as variance
+FROM GPG_data_all_2122 gpg
+JOIN siccodes sic
+ON gpg.siccodes = sic.Code
+GROUP BY 1,2
+ORDER BY 1,3 DESC;
